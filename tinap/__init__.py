@@ -1,7 +1,5 @@
 # encoding: utf-8
 import signal
-import sys
-import os
 import asyncio
 import argparse
 from queue import Queue, Empty
@@ -63,7 +61,7 @@ class Throttler(asyncio.Protocol):
 
     def connection_made(self, transport):
         self.upstream = UpstreamConnection(transport)
-        asyncio.async(
+        asyncio.ensure_future(
             self.loop.create_connection(lambda: self.upstream, self.host, self.port)
         )
 
@@ -87,15 +85,13 @@ async def shutdown(sig, server, loop):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="utproxy")
+    parser = argparse.ArgumentParser(description="Tinap port forwarder")
     parser.add_argument("--upstream-port", type=int, help="upstream port", default=8080)
 
     parser.add_argument(
         "--upstream-host", type=str, help="upstream host", default="127.0.0.1"
     )
-
     parser.add_argument("--port", type=int, help="port", default=8888)
-
     parser.add_argument("--host", type=str, help="host", default="127.0.0.1")
 
     args = parser.parse_args()
