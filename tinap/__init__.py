@@ -2,10 +2,13 @@
 import signal
 import asyncio
 import argparse
+import time
+
 from queue import Queue, Empty
 
 
-upstreams = []
+REMOVE_TCP_OVERHEAD = 1460.0 / 1500.0
+UPSTREAMS = []
 
 
 class UpstreamConnection(asyncio.Protocol):
@@ -19,7 +22,7 @@ class UpstreamConnection(asyncio.Protocol):
 
     def connection_made(self, transport):
         self.transport = transport
-        upstreams.append(self)
+        UPSTREAMS.append(self)
         while True:
             try:
                 data = self.offline_data.get_nowait()
@@ -28,10 +31,10 @@ class UpstreamConnection(asyncio.Protocol):
             self.transport.write(data)
 
     def data_received(self, data):
-        self.downstream.write(data)
+        asyncio.ensure_future(self.downstream.forward_data(data))
 
     def connection_lost(self, exc):
-        upstreams.remove(self)
+        UPSTREAMS.remove(self)
         self.downstream.close()
 
     def forward_data(self, data):
@@ -48,37 +51,74 @@ class UpstreamConnection(asyncio.Protocol):
         self.transport.close()
 
 
+class BandwidthControl:
+    def __init__(self, maxbps):
+        self.last_tick = time.clock()
+        self.maxbps = maxbps * 1000.0 / 8.0
+
+    def _max_sendable(self):
+        elapsed = time.clock() - self.last_tick
+        return elapsed * self.maxbps
+
+    async def available(self, data):
+        if self.maxbps == 0:
+            return
+        to_send = len(data)
+        while to_send > self._max_sendable():
+            await asyncio.sleep(0.1)
+        self.last_tick = time.clock()
+
+
 class Throttler(asyncio.Protocol):
     """ Creates the connection upstream to forward the data.
     With some throttling.
     """
 
-    def __init__(self, host, port):
+    def __init__(self, host, port, latency, inkbps, outkbps):
         self.host = host
         self.port = port
         self.upstream = None
         self.loop = asyncio.get_event_loop()
+        self.latency = latency
+        self.bandwidth_in = BandwidthControl(inkbps)
+        self.bandwidth_out = BandwidthControl(outkbps)
+        self.transport = None
 
     def connection_made(self, transport):
-        self.upstream = UpstreamConnection(transport)
+        self.transport = transport
+        self.upstream = UpstreamConnection(self)
         asyncio.ensure_future(
             self.loop.create_connection(lambda: self.upstream, self.host, self.port)
         )
 
+    async def forward_data(self, data):
+        """Data received from upstream.
+        """
+        await asyncio.sleep(self.latency)
+        await self.bandwidth_in.available(data)
+        self.transport.write(data)
+
     def data_received(self, data):
-        self._throttle(data)
-        self.upstream.forward_data(data)
+        """Data received from downstream.
+        """
+
+        async def _received():
+            await asyncio.sleep(self.latency)
+            await self.bandwidth_out.available(data)
+            self.upstream.forward_data(data)
+
+        asyncio.ensure_future(_received())
 
     def connection_lost(self, exc):
         self.upstream.close()
 
-    def _throttle(self, data):
-        # XXX implement the throttling here
-        pass
+    def close(self):
+        if self.transport is not None:
+            self.transport.close()
 
 
 async def shutdown(sig, server, loop):
-    for upstream in upstreams:
+    for upstream in UPSTREAMS:
         upstream.close()
     server.close()
     print("Bye!")
@@ -94,11 +134,36 @@ def main():
     parser.add_argument("--port", type=int, help="port", default=8888)
     parser.add_argument("--host", type=str, help="host", default="127.0.0.1")
 
+    # throttling options
+    parser.add_argument(
+        "-r", "--rtt", type=float, default=0.0, help="Round Trip Time Latency (in ms)."
+    )
+    parser.add_argument(
+        "-i",
+        "--inkbps",
+        type=float,
+        default=0.0,
+        help="Download Bandwidth (in 1000 bits/s - Kbps).",
+    )
+    parser.add_argument(
+        "-o",
+        "--outkbps",
+        type=float,
+        default=0.0,
+        help="Upload Bandwidth (in 1000 bits/s - Kbps).",
+    )
+
     args = parser.parse_args()
     loop = asyncio.get_event_loop()
 
     def throttler_factory():
-        return Throttler(args.upstream_host, args.upstream_port)
+        return Throttler(
+            args.upstream_host,
+            args.upstream_port,
+            args.rtt / 2000.0,
+            args.inkbps * REMOVE_TCP_OVERHEAD,
+            args.outkbps * REMOVE_TCP_OVERHEAD,
+        )
 
     print("Starting server %s:%d" % (args.host, args.port))
     server = loop.create_server(throttler_factory, args.host, args.port)
