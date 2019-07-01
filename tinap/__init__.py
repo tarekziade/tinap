@@ -63,9 +63,11 @@ class BandwidthControl:
     async def available(self, data):
         if self.maxbps == 0:
             return
-        to_send = len(data)
-        while to_send > self._max_sendable():
-            await asyncio.sleep(0.1)
+        extra = len(data) - self._max_sendable()
+        if extra > 0:
+            time_to_wait = float(extra) / self.maxbps
+            await asyncio.sleep(float(extra) / float(self.maxbps))
+
         self.last_tick = time.clock()
 
 
@@ -166,12 +168,25 @@ def main(args=None):
         return Throttler(
             args.upstream_host,
             args.upstream_port,
-            args.rtt / 2000.0,
+            args.rtt / 2000.,
             args.inkbps * REMOVE_TCP_OVERHEAD,
             args.outkbps * REMOVE_TCP_OVERHEAD,
         )
 
     print("Starting server %s:%d" % (args.host, args.port))
+    if args.rtt > 0:
+        print("Round Trip Latency (ms): %.d" % args.rtt)
+    else:
+        print("No latency added.")
+    if args.inkbps > 0:
+        print("Download bandwidth (kbps): %s" % args.inkbps)
+    else:
+        print("Free Download bandwidth")
+    if args.outkbps > 0:
+        print("Upload bandwidth (kbps): %s" % args.outkbps)
+    else:
+        print("Free Upload bandwidth")
+
     server = loop.create_server(throttler_factory, args.host, args.port)
 
     for sig in (signal.SIGTERM, signal.SIGINT):
