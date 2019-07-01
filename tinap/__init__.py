@@ -124,7 +124,7 @@ async def shutdown(sig, server, loop):
     print("Bye!")
 
 
-def main():
+def get_args():
     parser = argparse.ArgumentParser(description="Tinap port forwarder")
     parser.add_argument("--upstream-port", type=int, help="upstream port", default=8080)
 
@@ -153,7 +153,13 @@ def main():
         help="Upload Bandwidth (in 1000 bits/s - Kbps).",
     )
 
-    args = parser.parse_args()
+    return parser.parse_args()
+
+
+def main(args=None):
+    if args is None:
+        args = get_args()
+
     loop = asyncio.get_event_loop()
 
     def throttler_factory():
