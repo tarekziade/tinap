@@ -6,7 +6,7 @@ import time
 
 from queue import Queue, Empty
 
-
+# TCP overhead (value taken from tsproxy)
 REMOVE_TCP_OVERHEAD = 1460.0 / 1500.0
 UPSTREAMS = []
 
@@ -22,6 +22,7 @@ class UpstreamConnection(asyncio.Protocol):
     def connection_made(self, transport):
         self.transport = transport
         UPSTREAMS.append(self)
+        # Dequeuing offline data if any...
         while True:
             try:
                 data = self.offline_data.get_nowait()
@@ -175,6 +176,7 @@ def main(args=None):
         return Throttler(
             args.upstream_host,
             args.upstream_port,
+            # the latency is in seconds, and divided by two for each direction.
             args.rtt / 2000.,
             args.inkbps * REMOVE_TCP_OVERHEAD,
             args.outkbps * REMOVE_TCP_OVERHEAD,
