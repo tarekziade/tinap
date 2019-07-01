@@ -2,131 +2,13 @@
 import signal
 import asyncio
 import argparse
-import time
 
-from queue import Queue, Empty
+from tinap.fwd import ForwardServer
+from tinap.socks import SocksServer
+from tinap.util import shutdown
 
 # TCP overhead (value taken from tsproxy)
 REMOVE_TCP_OVERHEAD = 1460.0 / 1500.0
-UPSTREAMS = []
-
-
-class UpstreamConnection(asyncio.Protocol):
-    """Forwards all data upstream.
-    """
-    def __init__(self, downstream):
-        self.downstream = downstream
-        self.transport = None
-        self.offline_data = Queue()
-
-    def connection_made(self, transport):
-        self.transport = transport
-        UPSTREAMS.append(self)
-        # Dequeuing offline data if any...
-        while True:
-            try:
-                data = self.offline_data.get_nowait()
-            except Empty:
-                break
-            self.transport.write(data)
-
-    def data_received(self, data):
-        asyncio.ensure_future(self.downstream.forward_data(data))
-
-    def connection_lost(self, exc):
-        UPSTREAMS.remove(self)
-        self.downstream.close()
-
-    def forward_data(self, data):
-        if self.transport is None:
-            self.offline_data.put_nowait(data)
-        else:
-            self.transport.write(data)
-
-    def close(self):
-        if self.transport is None:
-            return
-        if self.transport.is_closing():
-            return
-        self.transport.close()
-
-
-class BandwidthControl:
-    """Adds delays to limit the bandwidth, given a max bps.
-    """
-    def __init__(self, maxbps):
-        self.last_tick = time.perf_counter()
-        self.maxbps = maxbps * 1000.0 / 8.0
-
-    def _max_sendable(self):
-        elapsed = time.perf_counter() - self.last_tick
-        return elapsed * self.maxbps
-
-    async def available(self, data):
-        if self.maxbps == 0:
-            return
-        extra = len(data) - self._max_sendable()
-        if extra > 0:
-            await asyncio.sleep(float(extra) / float(self.maxbps))
-        self.last_tick = time.perf_counter()
-
-
-class Throttler(asyncio.Protocol):
-    """Handles the connection upstream to forward the data.
-
-    Adds round trip latency and bandwidth limitation.
-    """
-
-    def __init__(self, host, port, latency, inkbps, outkbps):
-        self.host = host
-        self.port = port
-        self.upstream = None
-        self.loop = asyncio.get_event_loop()
-        self.latency = latency
-        self.bandwidth_in = BandwidthControl(inkbps)
-        self.bandwidth_out = BandwidthControl(outkbps)
-        self.transport = None
-
-    def connection_made(self, transport):
-        self.transport = transport
-        self.upstream = UpstreamConnection(self)
-        asyncio.ensure_future(
-            self.loop.create_connection(lambda: self.upstream, self.host, self.port)
-        )
-
-    async def forward_data(self, data):
-        """Data received from upstream.
-        """
-        await asyncio.sleep(self.latency)
-        await self.bandwidth_in.available(data)
-        self.transport.write(data)
-
-    def data_received(self, data):
-        """Data received from downstream.
-        """
-
-        async def _received():
-            await asyncio.sleep(self.latency)
-            await self.bandwidth_out.available(data)
-            self.upstream.forward_data(data)
-
-        asyncio.ensure_future(_received())
-
-    def connection_lost(self, exc):
-        self.upstream.close()
-
-    def close(self):
-        if self.transport is not None:
-            self.transport.close()
-
-
-async def shutdown(sig, server, loop):
-    """Called on any SIGTERM/SIGKILL to gracefully shutdown tinap.
-    """
-    for upstream in UPSTREAMS:
-        upstream.close()
-    server.close()
-    print("Bye!")
 
 
 def get_args():
@@ -139,6 +21,8 @@ def get_args():
     parser.add_argument("--port", type=int, help="port", default=8888)
     parser.add_argument("--host", type=str, help="host", default="127.0.0.1")
 
+    parser.add_argument("--mode", choices=["forward", "socks5"],
+            type=str, help="", default="forward")
     # throttling options
     parser.add_argument(
         "-r", "--rtt", type=float, default=0.0, help="Round Trip Time Latency (in ms)."
@@ -172,7 +56,14 @@ def main(args=None):
     loop = asyncio.get_event_loop()
 
     def throttler_factory():
-        return Throttler(
+        if args.mode == "forward":
+            klass = ForwardServer
+        elif args.mode == "socks5":
+            klass = SocksServer
+        else:
+            raise NotImplementedError()
+
+        return klass(
             args.upstream_host,
             args.upstream_port,
             # the latency is in seconds, and divided by two for each direction.
@@ -182,6 +73,7 @@ def main(args=None):
         )
 
     print("Starting server %s:%d" % (args.host, args.port))
+    print("Mode of operation: %s" % args.mode)
     if args.rtt > 0:
         print("Round Trip Latency (ms): %.d" % args.rtt)
     else:
