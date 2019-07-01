@@ -14,7 +14,6 @@ UPSTREAMS = []
 class UpstreamConnection(asyncio.Protocol):
     """Forwards all data upstream.
     """
-
     def __init__(self, downstream):
         self.downstream = downstream
         self.transport = None
@@ -52,6 +51,8 @@ class UpstreamConnection(asyncio.Protocol):
 
 
 class BandwidthControl:
+    """Adds delays to limit the bandwidth, given a max bps.
+    """
     def __init__(self, maxbps):
         self.last_tick = time.clock()
         self.maxbps = maxbps * 1000.0 / 8.0
@@ -71,8 +72,9 @@ class BandwidthControl:
 
 
 class Throttler(asyncio.Protocol):
-    """ Creates the connection upstream to forward the data.
-    With some throttling.
+    """Handles the connection upstream to forward the data.
+
+    Adds round trip latency and bandwidth limitation.
     """
 
     def __init__(self, host, port, latency, inkbps, outkbps):
@@ -119,6 +121,8 @@ class Throttler(asyncio.Protocol):
 
 
 async def shutdown(sig, server, loop):
+    """Called on any SIGTERM/SIGKILL to gracefully shutdown tinap.
+    """
     for upstream in UPSTREAMS:
         upstream.close()
     server.close()
@@ -158,6 +162,10 @@ def get_args():
 
 
 def main(args=None):
+    """
+    Creates the asyncio loop with a Throttler handler for each
+    new connection.
+    """
     if args is None:
         args = get_args()
 
