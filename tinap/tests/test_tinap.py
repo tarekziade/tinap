@@ -1,8 +1,6 @@
 import unittest
-import asyncio
 import signal
 import os
-import asyncio
 import time
 import threading
 
