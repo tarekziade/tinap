@@ -2,6 +2,7 @@ import asyncio
 from struct import pack, unpack
 from enum import IntEnum, unique
 import socket
+from tinap.throttler import BandwidthControl
 
 
 @unique
@@ -49,7 +50,6 @@ class SocksConnection(asyncio.Protocol):
             await asyncio.sleep(self.latency)
             await self.bandwidth_in.available(data)
             self.server_transport.write(data)
-
         asyncio.ensure_future(_write(data))
 
     def connection_lost(self, *args):
@@ -102,7 +102,6 @@ class SocksServer(asyncio.Protocol):
                 self.transport.close()
                 return
             if self.method is Method.NOAUTH:
-                print("next stage init")
                 self.state = State.INIT
             else:
                 self.state = State.AUTH
@@ -128,9 +127,7 @@ class SocksServer(asyncio.Protocol):
         async def _write(data):
             await asyncio.sleep(self.latency)
             await self.bandwidth_out.available(data)
-            import pdb; pdb.set_trace()
             self.client_transport.write(data)
-
         asyncio.ensure_future(_write(data))
 
     async def connect(self, host, port):
