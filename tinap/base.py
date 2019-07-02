@@ -1,18 +1,15 @@
-# encoding: utf-8
 import asyncio
-
 from queue import Queue, Empty
-from tinap.throttler import BandwidthControl
+
 from tinap.util import append_upstream, remove_upstream
+from tinap.throttler import BandwidthControl
 
 
 class UpstreamConnection(asyncio.Protocol):
-    """Forwards all data upstream.
-    """
     def __init__(self, downstream):
         self.downstream = downstream
-        self.transport = None
         self.offline_data = Queue()
+        self.transport = None
 
     def connection_made(self, transport):
         self.transport = transport
@@ -28,15 +25,15 @@ class UpstreamConnection(asyncio.Protocol):
     def data_received(self, data):
         asyncio.ensure_future(self.downstream.forward_data(data))
 
-    def connection_lost(self, exc):
-        remove_upstream(self)
-        self.downstream.close()
-
     def forward_data(self, data):
         if self.transport is None:
             self.offline_data.put_nowait(data)
         else:
             self.transport.write(data)
+
+    def connection_lost(self, *args):
+        remove_upstream(self)
+        self.downstream.close()
 
     def close(self):
         if self.transport is None:
@@ -46,12 +43,7 @@ class UpstreamConnection(asyncio.Protocol):
         self.transport.close()
 
 
-class ForwardServer(asyncio.Protocol):
-    """Handles the connection upstream to forward the data.
-
-    Adds round trip latency and bandwidth limitation.
-    """
-
+class BaseServer(asyncio.Protocol):
     def __init__(self, host, port, latency, inkbps, outkbps):
         self.host = host
         self.port = port
@@ -69,13 +61,6 @@ class ForwardServer(asyncio.Protocol):
             self.loop.create_connection(lambda: self.upstream, self.host, self.port)
         )
 
-    async def forward_data(self, data):
-        """Data received from upstream.
-        """
-        await asyncio.sleep(self.latency)
-        await self.bandwidth_in.available(data)
-        self.transport.write(data)
-
     def data_received(self, data):
         """Data received from downstream.
         """
@@ -88,8 +73,26 @@ class ForwardServer(asyncio.Protocol):
         asyncio.ensure_future(_received())
 
     def connection_lost(self, exc):
-        self.upstream.close()
+        if exc is not None:
+            print(exc)
+        if self.upstream is not None:
+            self.upstream.close()
 
     def close(self):
-        if self.transport is not None:
-            self.transport.close()
+        if self.transport is None:
+            return
+        if self.transport.is_closing():
+            return
+        self.transport.close()
+
+    async def forward_data(self, data):
+        """Data received from upstream.
+        """
+        await asyncio.sleep(self.latency)
+        # XXX breaks everything.. something's not right..
+        # await self.bandwidth_in.available(data)    # noqa
+        if self.transport is None:
+            return
+        if self.transport.is_closing():
+            return
+        self.transport.write(data)

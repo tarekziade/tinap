@@ -3,7 +3,7 @@ import signal
 import asyncio
 import argparse
 
-from tinap.fwd import ForwardServer
+from tinap.base import BaseServer
 from tinap.socks import SocksServer
 from tinap.util import shutdown
 
@@ -21,8 +21,9 @@ def get_args():
     parser.add_argument("--port", type=int, help="port", default=8888)
     parser.add_argument("--host", type=str, help="host", default="127.0.0.1")
 
-    parser.add_argument("--mode", choices=["forward", "socks5"],
-            type=str, help="", default="forward")
+    parser.add_argument(
+        "--mode", choices=["forward", "socks5"], type=str, help="", default="forward"
+    )
     # throttling options
     parser.add_argument(
         "-r", "--rtt", type=float, default=0.0, help="Round Trip Time Latency (in ms)."
@@ -57,7 +58,7 @@ def main(args=None):
 
     def throttler_factory():
         if args.mode == "forward":
-            klass = ForwardServer
+            klass = BaseServer
         elif args.mode == "socks5":
             klass = SocksServer
         else:
@@ -67,7 +68,7 @@ def main(args=None):
             args.upstream_host,
             args.upstream_port,
             # the latency is in seconds, and divided by two for each direction.
-            args.rtt / 2000.,
+            args.rtt / 2000.0,
             args.inkbps * REMOVE_TCP_OVERHEAD,
             args.outkbps * REMOVE_TCP_OVERHEAD,
         )

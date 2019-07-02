@@ -6,6 +6,7 @@ import time
 class BandwidthControl:
     """Adds delays to limit the bandwidth, given a max bps.
     """
+
     def __init__(self, maxbps):
         self.last_tick = time.perf_counter()
         self.maxbps = maxbps * 1000.0 / 8.0
@@ -19,6 +20,5 @@ class BandwidthControl:
             return
         extra = len(data) - self._max_sendable()
         if extra > 0:
-            print("not ready")
             await asyncio.sleep(float(extra) / float(self.maxbps))
         self.last_tick = time.perf_counter()

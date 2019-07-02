@@ -2,7 +2,8 @@ import asyncio
 from struct import pack, unpack
 from enum import IntEnum, unique
 import socket
-from tinap.throttler import BandwidthControl
+
+from tinap.base import UpstreamConnection, BaseServer
 
 
 @unique
@@ -34,53 +35,11 @@ class Connection(IntEnum):
     IPV6 = 4
 
 
-class SocksConnection(asyncio.Protocol):
-
-    def __init__(self, latency, inkbps):
-        self.latency = latency
-        self.bandwidth_in = BandwidthControl(inkbps)
-        self.transport = None
-
-    def connection_made(self, transport):
-        self.transport = transport
-        self.server_transport = None
-
-    def data_received(self, data):
-        async def _write(data):
-            await asyncio.sleep(self.latency)
-            await self.bandwidth_in.available(data)
-            self.server_transport.write(data)
-        asyncio.ensure_future(_write(data))
-
-    def connection_lost(self, *args):
-        self.server_transport.close()
-
-
-class SocksServer(asyncio.Protocol):
-    # XXX todo make a base class
-    def __init__(self, host, port, latency, inkbps, outkbps):
-        self.host = host
-        self.port = port
-        self.upstream = None
-        self.loop = asyncio.get_event_loop()
-        self.latency = latency
-        self.inkbps = inkbps
-        self.bandwidth_out = BandwidthControl(outkbps)
-        self.transport = None
-
+class SocksServer(BaseServer):
     def connection_made(self, transport):
         self.transport = transport
         self.state = State.HELLO
         self.method = Method.USER
-        self.loop = asyncio.get_event_loop()
-
-    async def _create_conn(self, host, port):
-        return await self.loop.create_connection(
-                lambda: SocksConnection(self.latency, self.inkbps),
-                                        host, port)
-
-    def connection_lost(self, exc):
-        self.transport.close()
 
     def data_received(self, data):
         if self.state is State.HELLO:
@@ -121,20 +80,14 @@ class SocksServer(asyncio.Protocol):
             else:
                 raise NotImplementedError()
         elif self.state is State.DATA:
-            self.client_write(data)
-
-    def client_write(self, data):
-        async def _write(data):
-            await asyncio.sleep(self.latency)
-            await self.bandwidth_out.available(data)
-            self.client_transport.write(data)
-        asyncio.ensure_future(_write(data))
+            BaseServer.data_received(self, data)
 
     async def connect(self, host, port):
-        transport, client = await self._create_conn(host, port)
-        client.server_transport = self.transport
-        self.client_transport = transport
-        hostip, port = transport.get_extra_info("sockname")
+        t, c = await self.loop.create_connection(
+            lambda: UpstreamConnection(self), host, port
+        )
+        self.upstream = c
+        hostip, port = t.get_extra_info("sockname")
         host = unpack("!I", socket.inet_aton(hostip))[0]
         self.transport.write(pack("!BBBBIH", 0x05, 0x00, 0x00, 0x01, host, port))
 
