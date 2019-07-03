@@ -24,6 +24,8 @@ class TestTinap(unittest.TestCase):
             inkbps = 0.0
             outkbps = 0.0
             mode = "forward"
+            mapports = None
+            desthost = None
 
         args = FakeArgs()
         res = []

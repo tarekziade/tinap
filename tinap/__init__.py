@@ -5,7 +5,7 @@ import argparse
 
 from tinap.base import BaseServer
 from tinap.socks import SocksServer
-from tinap.util import shutdown
+from tinap.util import shutdown, parse_port_mappings
 
 # TCP overhead (value taken from tsproxy)
 REMOVE_TCP_OVERHEAD = 1460.0 / 1500.0
@@ -26,11 +26,19 @@ def get_args():
     )
 
     # socks5 mode
-    parser.add_argument('-d', '--desthost',
-      help="Redirect all outbound connections to the specified host.")
-    parser.add_argument('-m', '--mapports',
-      help=("Remap outbound ports. Comma-separated list of original:new with * as a wildcard."
-            "--mapports '443:8443,*:8080'"))
+    parser.add_argument(
+        "-d",
+        "--desthost",
+        help="Redirect all outbound connections to the specified host.",
+    )
+    parser.add_argument(
+        "-m",
+        "--mapports",
+        help=(
+            "Remap outbound ports. Comma-separated list of original:new with * as a wildcard."
+            "--mapports '443:8443,*:8080'"
+        ),
+    )
 
     # throttling options
     parser.add_argument(
@@ -71,30 +79,33 @@ def main(args=None):
             klass = SocksServer
         else:
             raise NotImplementedError()
-
-        return klass(
-            args.upstream_host,
-            args.upstream_port,
-            # the latency is in seconds, and divided by two for each direction.
-            args.rtt / 2000.0,
-            args.inkbps * REMOVE_TCP_OVERHEAD,
-            args.outkbps * REMOVE_TCP_OVERHEAD,
-        )
+        return klass(args)
 
     print("Starting server %s:%d" % (args.host, args.port))
     print("Mode of operation: %s" % args.mode)
     if args.rtt > 0:
         print("Round Trip Latency (ms): %.d" % args.rtt)
+        # the latency is in seconds, and divided by two for each direction.
+        args.rtt = args.rtt / 2000.0
     else:
         print("No latency added.")
     if args.inkbps > 0:
         print("Download bandwidth (kbps): %s" % args.inkbps)
+        args.inkbps = args.inkbps * REMOVE_TCP_OVERHEAD
     else:
         print("Free Download bandwidth")
     if args.outkbps > 0:
         print("Upload bandwidth (kbps): %s" % args.outkbps)
+        args.outkbps = args.outkbps * REMOVE_TCP_OVERHEAD
     else:
         print("Free Upload bandwidth")
+
+    if args.mapports is not None:
+        args.mapports = parse_port_mappings(args.mapports)
+        print("Port mapping: %s" % args.mapports)
+
+    if args.desthost:
+        print("Using %s for all outbound connections" % args.desthost)
 
     server = loop.create_server(throttler_factory, args.host, args.port)
 

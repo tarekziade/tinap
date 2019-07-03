@@ -44,24 +44,35 @@ class UpstreamConnection(asyncio.Protocol):
 
 
 class BaseServer(asyncio.Protocol):
-    def __init__(self, host, port, latency, inkbps, outkbps):
-        self.host = host
-        self.port = port
+    def __init__(self, args):
+        self.host = args.upstream_host
+        self.port = args.upstream_port
         self.upstream = None
         self.loop = asyncio.get_event_loop()
-        self.latency = latency
-        self.bandwidth_in = BandwidthControl(inkbps)
-        self.bandwidth_out = BandwidthControl(outkbps)
+        self.latency = args.rtt
+        self.bandwidth_in = BandwidthControl(args.inkbps)
+        self.bandwidth_out = BandwidthControl(args.outkbps)
         self.transport = None
         self._data = Queue()
+
+    async def _sconnect(self):
+        try:
+            await asyncio.wait_for(
+                self.loop.create_connection(
+                    lambda: self.upstream, self.host, self.port
+                ),
+                timeout=5,
+            )
+        except (asyncio.TimeoutError, OSError):
+            print("Timeout or error connecting to %s:%d" % (self.host, self.port))
+            self.close()
+            return
+        asyncio.ensure_future(self._dequeue())
 
     def connection_made(self, transport):
         self.transport = transport
         self.upstream = UpstreamConnection(self)
-        asyncio.ensure_future(
-            self.loop.create_connection(lambda: self.upstream, self.host, self.port)
-        )
-        asyncio.ensure_future(self._dequeue())
+        asyncio.ensure_future(self._sconnect())
 
     def data_received(self, data):
         """Data received from downstream.
