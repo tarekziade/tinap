@@ -24,3 +24,7 @@ test: build
 
 docs:  build
 	$(BIN)/tox -e docs
+
+installer:
+	$(BIN)/pip install pyinstaller
+	$(BIN)/pyinstaller --onefile tinap.spec
