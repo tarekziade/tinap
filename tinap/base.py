@@ -2,7 +2,7 @@ import asyncio
 from queue import Queue, Empty
 
 from tinap.util import append_upstream, remove_upstream
-from tinap.throttler import BandwidthControl
+from tinap.throttler import Throttler
 
 
 class UpstreamConnection(asyncio.Protocol):
@@ -23,9 +23,9 @@ class UpstreamConnection(asyncio.Protocol):
             self.transport.write(data)
 
     def data_received(self, data):
-        asyncio.ensure_future(self.downstream.forward_data(data))
+        self.downstream.forward_data(data)
 
-    def forward_data(self, data):
+    def write(self, data):
         if self.transport is None:
             self.offline_data.put_nowait(data)
         else:
@@ -45,15 +45,18 @@ class UpstreamConnection(asyncio.Protocol):
 
 class BaseServer(asyncio.Protocol):
     def __init__(self, args):
-        self.host = args.upstream_host
-        self.port = args.upstream_port
+        if args.mode == "forward":
+            self.host = args.upstream_host
+            self.port = args.upstream_port
+        self.mode = args.mode
         self.upstream = None
         self.loop = asyncio.get_event_loop()
         self.latency = args.rtt
-        self.bandwidth_in = BandwidthControl(args.inkbps)
-        self.bandwidth_out = BandwidthControl(args.outkbps)
+        self.data_in = None
+        self.data_out = None
+        self.outkbps = args.outkbps
+        self.inkbps = args.inkbps
         self.transport = None
-        self._data = Queue()
 
     async def _sconnect(self):
         try:
@@ -67,29 +70,17 @@ class BaseServer(asyncio.Protocol):
             print("Timeout or error connecting to %s:%d" % (self.host, self.port))
             self.close()
             return
-        asyncio.ensure_future(self._dequeue())
+        self.data_in.start()
+        self.data_out.start()
 
     def connection_made(self, transport):
+        if self.mode != "forward":
+            raise NotImplementedError("Subclass me!")
         self.transport = transport
         self.upstream = UpstreamConnection(self)
+        self.data_in = Throttler("up", self.upstream, self.latency, self.inkbps)
+        self.data_out = Throttler("down", self.transport, self.latency, self.outkbps)
         asyncio.ensure_future(self._sconnect())
-
-    def data_received(self, data):
-        """Data received from downstream.
-        """
-        self._data.put_nowait(data)
-
-    async def _dequeue(self):
-        # XXX CPU intensive ? can be improved with a blocking wait
-        while True:
-            try:
-                data = self._data.get_nowait()
-            except Empty:
-                break
-            await asyncio.sleep(self.latency)
-            await self.bandwidth_out.available(data)
-            self.upstream.forward_data(data)
-        asyncio.ensure_future(self._dequeue())
 
     def connection_lost(self, exc):
         if exc is not None:
@@ -98,20 +89,18 @@ class BaseServer(asyncio.Protocol):
             self.upstream.close()
 
     def close(self):
+        if self.data_in is not None:
+            self.data_in.stop()
+        if self.data_out is not None:
+            self.data_out.stop()
         if self.transport is None:
             return
         if self.transport.is_closing():
             return
         self.transport.close()
 
-    async def forward_data(self, data):
-        """Data received from upstream.
-        """
-        await asyncio.sleep(self.latency)
-        # XXX breaks everything.. something's not right..
-        # await self.bandwidth_in.available(data)    # noqa
-        if self.transport is None:
-            return
-        if self.transport.is_closing():
-            return
-        self.transport.write(data)
+    def forward_data(self, data):
+        self.data_out.put(data)
+
+    def data_received(self, data):
+        self.data_in.put(data)

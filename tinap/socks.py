@@ -4,6 +4,7 @@ from enum import IntEnum, unique
 import socket
 
 from tinap.base import UpstreamConnection, BaseServer
+from tinap.throttler import Throttler
 
 
 @unique
@@ -38,7 +39,7 @@ class Connection(IntEnum):
 class SocksServer(BaseServer):
     def __init__(self, args):
         BaseServer.__init__(self, args)
-        self.port_mapping = args.port_mapping
+        self.port_mapping = args.mapports
         self.dest_address = self._get_dest(args.desthost)
 
     def _get_dest_port(self, port):
@@ -107,11 +108,16 @@ class SocksServer(BaseServer):
         if self.dest_address is not None:
             host = self.dest_address
         port = self._get_dest_port(port)
+
+        def upstream():
+            self.upstream = UpstreamConnection(self)
+            self.data_in = Throttler("up", self.upstream, self.latency, self.inkbps)
+            self.data_out = Throttler("down", self.transport, self.latency, self.outkbps)
+            return self.upstream
+
         try:
             t, c = await asyncio.wait_for(
-                self.loop.create_connection(
-                    lambda: UpstreamConnection(self), host, port
-                ),
+                self.loop.create_connection(upstream, host, port),
                 timeout=5,
             )
         except (asyncio.TimeoutError, OSError):
@@ -122,7 +128,8 @@ class SocksServer(BaseServer):
         hostip, port = t.get_extra_info("sockname")
         host = unpack("!I", socket.inet_aton(hostip))[0]
         self.transport.write(pack("!BBBBIH", 0x05, 0x00, 0x00, 0x01, host, port))
-        asyncio.ensure_future(self._dequeue())
+        self.data_in.start()
+        self.data_out.start()
 
     def parse_connect(self, atype, data):
         cur = 4
