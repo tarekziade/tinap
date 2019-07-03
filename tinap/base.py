@@ -53,6 +53,7 @@ class BaseServer(asyncio.Protocol):
         self.bandwidth_in = BandwidthControl(inkbps)
         self.bandwidth_out = BandwidthControl(outkbps)
         self.transport = None
+        self._data = Queue()
 
     def connection_made(self, transport):
         self.transport = transport
@@ -60,17 +61,24 @@ class BaseServer(asyncio.Protocol):
         asyncio.ensure_future(
             self.loop.create_connection(lambda: self.upstream, self.host, self.port)
         )
+        asyncio.ensure_future(self._dequeue())
 
     def data_received(self, data):
         """Data received from downstream.
         """
+        self._data.put_nowait(data)
 
-        async def _received():
+    async def _dequeue(self):
+        # XXX CPU intensive ? can be improved with a blocking wait
+        while True:
+            try:
+                data = self._data.get_nowait()
+            except Empty:
+                break
             await asyncio.sleep(self.latency)
             await self.bandwidth_out.available(data)
             self.upstream.forward_data(data)
-
-        asyncio.ensure_future(_received())
+        asyncio.ensure_future(self._dequeue())
 
     def connection_lost(self, exc):
         if exc is not None:

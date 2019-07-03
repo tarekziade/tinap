@@ -90,6 +90,7 @@ class SocksServer(BaseServer):
         hostip, port = t.get_extra_info("sockname")
         host = unpack("!I", socket.inet_aton(hostip))[0]
         self.transport.write(pack("!BBBBIH", 0x05, 0x00, 0x00, 0x01, host, port))
+        asyncio.ensure_future(self._dequeue())
 
     def parse_connect(self, atype, data):
         cur = 4
