@@ -13,17 +13,25 @@ REMOVE_TCP_OVERHEAD = 1460.0 / 1500.0
 
 def get_args():
     parser = argparse.ArgumentParser(description="Tinap port forwarder")
-    parser.add_argument("--upstream-port", type=int, help="upstream port", default=8080)
-
-    parser.add_argument(
-        "--upstream-host", type=str, help="upstream host", default="127.0.0.1"
-    )
     parser.add_argument("--port", type=int, help="port", default=8888)
     parser.add_argument("--host", type=str, help="host", default="127.0.0.1")
-
     parser.add_argument(
         "--mode", choices=["forward", "socks5"], type=str, help="", default="forward"
     )
+
+    # fwd mode
+    parser.add_argument("--upstream-port", type=int, help="upstream port", default=8080)
+    parser.add_argument(
+        "--upstream-host", type=str, help="upstream host", default="127.0.0.1"
+    )
+
+    # socks5 mode
+    parser.add_argument('-d', '--desthost',
+      help="Redirect all outbound connections to the specified host.")
+    parser.add_argument('-m', '--mapports',
+      help=("Remap outbound ports. Comma-separated list of original:new with * as a wildcard."
+            "--mapports '443:8443,*:8080'"))
+
     # throttling options
     parser.add_argument(
         "-r", "--rtt", type=float, default=0.0, help="Round Trip Time Latency (in ms)."
