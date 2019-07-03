@@ -36,6 +36,27 @@ class Connection(IntEnum):
 
 
 class SocksServer(BaseServer):
+    def __init__(self, args):
+        BaseServer.__init__(self, args)
+        self.port_mapping = args.port_mapping
+        self.dest_address = self._get_dest(args.desthost)
+
+    def _get_dest_port(self, port):
+        if self.port_mapping is None:
+            return port
+        src_port = str(port)
+        if src_port in self.port_mapping:
+            return self.port_mapping[src_port]
+        elif "default" in self.port_mapping:
+            return self.port_mapping["default"]
+        return port
+
+    def _get_dest(self, desthost):
+        if desthost is None:
+            return None
+        addrinfo = socket.getaddrinfo(desthost, self._get_dest_port(80))
+        return addrinfo[0][4][0]
+
     def connection_made(self, transport):
         self.transport = transport
         self.state = State.HELLO
@@ -83,9 +104,20 @@ class SocksServer(BaseServer):
             BaseServer.data_received(self, data)
 
     async def connect(self, host, port):
-        t, c = await self.loop.create_connection(
-            lambda: UpstreamConnection(self), host, port
-        )
+        if self.dest_address is not None:
+            host = self.dest_address
+        port = self._get_dest_port(port)
+        try:
+            t, c = await asyncio.wait_for(
+                self.loop.create_connection(
+                    lambda: UpstreamConnection(self), host, port
+                ),
+                timeout=5,
+            )
+        except (asyncio.TimeoutError, OSError):
+            print("Timeout or error connecting to %s:%d" % (host, port))
+            self.close()
+            return
         self.upstream = c
         hostip, port = t.get_extra_info("sockname")
         host = unpack("!I", socket.inet_aton(hostip))[0]
