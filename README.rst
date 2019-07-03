@@ -4,40 +4,72 @@ tinap
 
 tinap -- stands for This Is Not A Proxy
 
-**port forwarding with network shaping**
-
-This is intended to replace tsproxy https://github.com/WPO-Foundation/tsproxy
-for throttling network connections.
-
-Instead of implementing a SOCKS or HTTP proxy, this simply passes along
-the data it receives to another port, and adds the throttling.
-
-The benefit of using a raw stream TCP server is that we can put it
-in front of any server to shape the network.
-
-For instance, it can be used as the HTTP(S) proxy in Firefox, as long
-as it's put in front of a real proxy, like Mitmproxy.
+Features:
+- Plain port forwarding or Socks5 proxy mode
+- Network traffic shaping copied from `tsproxy <This is intended to replace tsproxy https://github.com/WPO-Foundation/tsproxy>`_
 
 
-Setting up tinap with mitmproxy
-===============================
+How to use
+==========
 
-You don't need to configure a new certificate in this configuration.
+Tinap has a few general options, followed by a mode (forward or socks)::
 
-1. run tinap locally on port 8080, set to forward requests to mitmproxy::
+   $ tinap --help
+   usage: tinap [-h] [--port PORT] [--host HOST] [-r RTT] [-i INKBPS]
+               [-o OUTKBPS]
+               {forward,socks5} ...
 
-   $ tinap --port 8080 --upstream-port 8888
+   Tinap port forwarder
 
-2. run mitmproxy on port 8888::
+   positional arguments:
+   {forward,socks5}      Mode of operation
+      forward             Port forwarding
+      socks5              Socks5 Pproxy
 
-   $ mitmdump --listen-port 8888
+   optional arguments:
+   -h, --help            show this help message and exit
+   --port PORT           port
+   --host HOST           host
+   -r RTT, --rtt RTT     Round Trip Time Latency (in ms).
+   -i INKBPS, --inkbps INKBPS
+                           Download Bandwidth (in 1000 bits/s - Kbps).
+   -o OUTKBPS, --outkbps OUTKBPS
+                           Upload Bandwidth (in 1000 bits/s - Kbps).
 
-3. set your browser proxy to point to localhost:8080
+The forward mode needs to know where to forward things::
+
+   $ tinap forward --help
+   usage: tinap forward [-h] [--upstream-port UPSTREAM_PORT]
+                        [--upstream-host UPSTREAM_HOST]
+
+   optional arguments:
+   -h, --help            show this help message and exit
+   --upstream-port UPSTREAM_PORT
+                           upstream port
+   --upstream-host UPSTREAM_HOST
+                           upstream host
+
+And the socks mode has its own extra options, copied from tsproxy::
+
+   $ tinap socks5 --help
+   usage: tinap socks5 [-h] [-d DESTHOST] [-m MAPPORTS]
+
+   optional arguments:
+   -h, --help            show this help message and exit
+   -d DESTHOST, --desthost DESTHOST
+                           Redirect all outbound connections to the specified
+                           host.
+   -m MAPPORTS, --mapports MAPPORTS
+                           Remap outbound ports. Comma-separated list of
+                           original:new with * as a wildcard.--mapports
+                           '443:8443,*:8080'
 
 
-Adding delays
-=============
+Configuration examples
+======================
 
-tinap can be used with the same options than tsproxy. Example for a regular 3G::
+XXX show 2 full setups:
+- firefox <> tinap <> wpr
+- firefox <> tinap <> mitmproxy
 
-   $ tinap --port 8080 --upstream-port 8888 --inkbps 750 --outkbps 250 --rtt 100
+
