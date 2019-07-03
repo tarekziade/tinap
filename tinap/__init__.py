@@ -2,6 +2,7 @@
 import signal
 import asyncio
 import argparse
+import sys
 
 from tinap.base import BaseServer
 from tinap.socks import SocksServer
@@ -15,23 +16,23 @@ def get_args():
     parser = argparse.ArgumentParser(description="Tinap port forwarder")
     parser.add_argument("--port", type=int, help="port", default=8888)
     parser.add_argument("--host", type=str, help="host", default="127.0.0.1")
-    parser.add_argument(
-        "--mode", choices=["forward", "socks5"], type=str, help="", default="forward"
-    )
+    subparsers = parser.add_subparsers(help='Mode of operation', dest='mode')
 
     # fwd mode
-    parser.add_argument("--upstream-port", type=int, help="upstream port", default=8080)
-    parser.add_argument(
+    parser_fwd = subparsers.add_parser('forward', help='Port forwarding')
+    parser_fwd.add_argument("--upstream-port", type=int, help="upstream port", default=8080)
+    parser_fwd.add_argument(
         "--upstream-host", type=str, help="upstream host", default="127.0.0.1"
     )
 
     # socks5 mode
-    parser.add_argument(
+    parser_socks5 = subparsers.add_parser('socks5', help='Socks5 Pproxy')
+    parser_socks5.add_argument(
         "-d",
         "--desthost",
         help="Redirect all outbound connections to the specified host.",
     )
-    parser.add_argument(
+    parser_socks5.add_argument(
         "-m",
         "--mapports",
         help=(
@@ -59,7 +60,14 @@ def get_args():
         help="Upload Bandwidth (in 1000 bits/s - Kbps).",
     )
 
-    return parser.parse_args()
+    args = parser.parse_args()
+    if args.mode is None:
+        print("You need to define a mode of operation.")
+        print("")
+        parser.print_help()
+        return sys.exit(1)
+
+    return args
 
 
 def main(args=None):
@@ -100,13 +108,16 @@ def main(args=None):
     else:
         print("Free Upload bandwidth")
 
-    if args.mapports is not None:
+    if args.mode == "socks5" and args.mapports is not None:
         args.mapports = parse_port_mappings(args.mapports)
         print("Port mapping: %s" % args.mapports)
 
-    if args.desthost:
+    if args.mode == "socks5" and args.desthost:
         print("Using %s for all outbound connections" % args.desthost)
 
+    if args.mode == "forward":
+        print("Upstream server: %s:%s" % (args.upstream_host,
+                                          args.upstream_port))
     server = loop.create_server(throttler_factory, args.host, args.port)
 
     for sig in (signal.SIGTERM, signal.SIGINT):
