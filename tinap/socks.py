@@ -94,7 +94,6 @@ class SocksServer(BaseServer):
             ver, cmd, rsv, atype = unpack("!BBBB", data[0:4])
             if cmd == Command.CONNECT:
                 host, port = self.parse_connect(atype, data)
-                self.state = State.DATA
                 asyncio.ensure_future(self.connect(host, port))
                 self.state = State.DATA
             elif cmd == Command.BIND:

@@ -15,6 +15,7 @@ class UpstreamConnection(asyncio.Protocol):
         self.transport = transport
         append_upstream(self)
         # Dequeuing offline data if any...
+        # XXX move this to asyncio.Queue
         while True:
             try:
                 data = self.offline_data.get_nowait()

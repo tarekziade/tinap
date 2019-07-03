@@ -1,7 +1,6 @@
 # encoding: utf-8
 import asyncio
 import time
-from queue import Queue, Empty
 
 
 class BandwidthControl:
@@ -27,7 +26,7 @@ class BandwidthControl:
 
 class Throttler:
     def __init__(self, name, transport, latency, bandwidth):
-        self._data = Queue()
+        self._data = asyncio.Queue()
         if bandwidth == 0:
             self._ctrl = None
         else:
@@ -38,24 +37,22 @@ class Throttler:
         self.name = name
 
     def start(self):
-        asyncio.ensure_future(self._dequeue())
         self.running = True
+        asyncio.ensure_future(self._dequeue())
 
     def stop(self):
         self.running = False
+        self.put(None)
 
     def put(self, data):
         self._data.put_nowait(data)
 
     async def _dequeue(self):
-        # XXX CPU intensive ? can be improved with a blocking wait
         while self.running:
-            try:
-                data = self._data.get_nowait()
-            except Empty:
-                break
+            data = await self._data.get()
+            if data is None:
+                return
             await asyncio.sleep(self.latency)
             if self._ctrl is not None:
                 await self._ctrl.available(data)
             self.transport.write(data)
-        asyncio.ensure_future(self._dequeue())
