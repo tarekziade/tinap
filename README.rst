@@ -5,6 +5,7 @@ tinap
 tinap -- stands for This Is Not A Proxy
 
 Features:
+
 - Plain port forwarding or Socks5 proxy mode
 - Network traffic shaping copied from `tsproxy <This is intended to replace tsproxy https://github.com/WPO-Foundation/tsproxy>`_
 
