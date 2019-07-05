@@ -2,7 +2,11 @@
 tinap
 =====
 
-tinap -- stands for This Is Not A Proxy
+tinap -- stands for "This Is Not A Proxy"
+
+It's also a beautiful place in Bangladesh with the biggest waterfall of that country.
+
+The Urban Dictionary also `says <https://www.urbandictionary.com/define.php?term=tinap>`_ it's "young people who go to rave parties who are dressed in bright and extreme styles of clothing".
 
 Features:
 
