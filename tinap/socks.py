@@ -5,6 +5,7 @@ import socket
 
 from tinap.base import UpstreamConnection, BaseServer
 from tinap.throttler import Throttler
+from tinap.util import resolve
 
 
 @unique
@@ -40,7 +41,8 @@ class SocksServer(BaseServer):
     def __init__(self, args):
         BaseServer.__init__(self, args)
         self.port_mapping = args.mapports
-        self.dest_address = self._get_dest(args.desthost)
+        self.dest_host = args.desthost
+        self.dest_address = None
 
     def _get_dest_port(self, port):
         if self.port_mapping is None:
@@ -51,12 +53,6 @@ class SocksServer(BaseServer):
         elif "default" in self.port_mapping:
             return self.port_mapping["default"]
         return port
-
-    def _get_dest(self, desthost):
-        if desthost is None:
-            return None
-        addrinfo = socket.getaddrinfo(desthost, self._get_dest_port(80))
-        return addrinfo[0][4][0]
 
     def connection_made(self, transport):
         self.transport = transport
@@ -104,20 +100,21 @@ class SocksServer(BaseServer):
             BaseServer.data_received(self, data)
 
     async def connect(self, host, port):
-        if self.dest_address is not None:
-            host = self.dest_address
         port = self._get_dest_port(port)
+        if self.dest_host is not None and self.dest_address is None:
+            host = self.dest_address = await resolve(self.dest_host, port)
 
         def upstream():
             self.upstream = UpstreamConnection(self)
             self.data_in = Throttler("up", self.upstream, self.latency, self.inkbps)
-            self.data_out = Throttler("down", self.transport, self.latency, self.outkbps)
+            self.data_out = Throttler(
+                "down", self.transport, self.latency, self.outkbps
+            )
             return self.upstream
 
         try:
             t, c = await asyncio.wait_for(
-                self.loop.create_connection(upstream, host, port),
-                timeout=5,
+                self.loop.create_connection(upstream, host, port), timeout=5
             )
         except (asyncio.TimeoutError, OSError):
             print("Timeout or error connecting to %s:%d" % (host, port))

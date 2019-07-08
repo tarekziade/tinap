@@ -16,17 +16,19 @@ def get_args():
     parser = argparse.ArgumentParser(description="Tinap port forwarder")
     parser.add_argument("--port", type=int, help="port", default=8888)
     parser.add_argument("--host", type=str, help="host", default="127.0.0.1")
-    subparsers = parser.add_subparsers(help='Mode of operation', dest='mode')
+    subparsers = parser.add_subparsers(help="Mode of operation", dest="mode")
 
     # fwd mode
-    parser_fwd = subparsers.add_parser('forward', help='Port forwarding')
-    parser_fwd.add_argument("--upstream-port", type=int, help="upstream port", default=8080)
+    parser_fwd = subparsers.add_parser("forward", help="Port forwarding")
+    parser_fwd.add_argument(
+        "--upstream-port", type=int, help="upstream port", default=8080
+    )
     parser_fwd.add_argument(
         "--upstream-host", type=str, help="upstream host", default="127.0.0.1"
     )
 
     # socks5 mode
-    parser_socks5 = subparsers.add_parser('socks5', help='Socks5 Pproxy')
+    parser_socks5 = subparsers.add_parser("socks5", help="Socks5 Proxy")
     parser_socks5.add_argument(
         "-d",
         "--desthost",
@@ -116,8 +118,7 @@ def main(args=None):
         print("Using %s for all outbound connections" % args.desthost)
 
     if args.mode == "forward":
-        print("Upstream server: %s:%s" % (args.upstream_host,
-                                          args.upstream_port))
+        print("Upstream server: %s:%s" % (args.upstream_host, args.upstream_port))
     server = loop.create_server(throttler_factory, args.host, args.port)
 
     for sig in (signal.SIGTERM, signal.SIGINT):

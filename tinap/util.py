@@ -1,4 +1,6 @@
 # Utilities
+import asyncio
+
 UPSTREAMS = []
 
 
@@ -29,3 +31,14 @@ def parse_port_mappings(option):
         else:
             port_mappings[src] = int(dest)
     return port_mappings
+
+
+_DNS_CACHE = {}
+
+
+async def resolve(host, port=80):
+    if host in _DNS_CACHE:
+        return _DNS_CACHE[host]
+    addrinfo = await asyncio.get_event_loop().getaddrinfo(host, port)
+    _DNS_CACHE[host] = addrinfo[0][4][0]
+    return _DNS_CACHE[host]
