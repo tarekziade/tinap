@@ -69,11 +69,11 @@ class TestTinap(unittest.TestCase):
 
     @coserver()
     def test_rtt(self):
-        duration, resp = self._run_test(rtt=1500)
+        duration, resp = self._run_test(rtt=2000)
         # we've added 200ms, the round trip should be higher
-        self.assertTrue(duration > 1.5, duration)
-        # the added duration should be less than 0.5
-        self.assertTrue(duration < 2.5, duration)
+        self.assertTrue(duration > 2.0, duration)
+        # the added duration should be less than 3 sec
+        self.assertTrue(duration < 3.0, duration)
         # make sure we're getting the directory listing through tinap
         self.assertTrue("Directory listing" in resp.text)
 
