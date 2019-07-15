@@ -119,16 +119,18 @@ def main(args=None):
 
     if args.mode == "forward":
         print("Upstream server: %s:%s" % (args.upstream_host, args.upstream_port))
+
     server = loop.create_server(throttler_factory, args.host, args.port)
+    server = loop.run_until_complete(server)
+    assert server is not None
 
     for sig in (signal.SIGTERM, signal.SIGINT):
         loop.add_signal_handler(
-            sig, lambda sig=sig: asyncio.ensure_future(shutdown(sig, server, loop))
+            sig, lambda sig=sig: asyncio.ensure_future(shutdown(server))
         )
 
-    server = loop.run_until_complete(server)
-    if server is not None:
-        loop.run_until_complete(server.wait_closed())
+    loop.run_until_complete(server.wait_closed())
+    loop.close()
 
 
 if __name__ == "__main__":

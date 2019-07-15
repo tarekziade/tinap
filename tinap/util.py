@@ -12,7 +12,7 @@ def remove_upstream(upstream):
     UPSTREAMS.remove(upstream)
 
 
-async def shutdown(sig, server, loop):
+async def shutdown(server):
     """Called on any SIGTERM/SIGKILL to gracefully shutdown tinap.
     """
     for upstream in UPSTREAMS:
