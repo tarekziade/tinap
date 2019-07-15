@@ -127,7 +127,8 @@ def main(args=None):
         )
 
     server = loop.run_until_complete(server)
-    loop.run_until_complete(server.wait_closed())
+    if server is not None:
+        loop.run_until_complete(server.wait_closed())
 
 
 if __name__ == "__main__":

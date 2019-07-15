@@ -90,15 +90,18 @@ class BaseServer(asyncio.Protocol):
             self.upstream.close()
 
     def close(self):
-        if self.data_in is not None:
-            self.data_in.stop()
-        if self.data_out is not None:
-            self.data_out.stop()
-        if self.transport is None:
-            return
-        if self.transport.is_closing():
-            return
-        self.transport.close()
+        async def _drain():
+            if self.data_in is not None:
+                await self.data_in.stop()
+            if self.data_out is not None:
+                await self.data_out.stop()
+            if self.transport is None:
+                return
+            if self.transport.is_closing():
+                return
+            self.transport.close()
+
+        asyncio.ensure_future(_drain())
 
     def forward_data(self, data):
         self.data_out.put(data)

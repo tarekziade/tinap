@@ -32,27 +32,27 @@ class Throttler:
         else:
             self._ctrl = BandwidthControl(bandwidth)
         self.latency = latency
-        self.running = False
         self.transport = transport
         self.name = name
+        self.finished = asyncio.Event()
 
     def start(self):
-        self.running = True
         asyncio.ensure_future(self._dequeue())
 
-    def stop(self):
-        self.running = False
+    async def stop(self):
         self.put(None)
+        await self.finished.wait()
 
     def put(self, data):
         self._data.put_nowait(data)
 
     async def _dequeue(self):
-        while self.running:
+        while True:
             data = await self._data.get()
             if data is None:
-                return
+                break
             await asyncio.sleep(self.latency)
             if self._ctrl is not None:
                 await self._ctrl.available(data)
             self.transport.write(data)
+        self.finished.set()
