@@ -15,7 +15,7 @@ REMOVE_TCP_OVERHEAD = 1460.0 / 1500.0
 def get_args():
     parser = argparse.ArgumentParser(description="Tinap port forwarder")
     parser.add_argument(
-        "--verbose", action="store_true", help="Verbose mode", default=False
+        "-v", "--verbose", action="store_true", help="Verbose mode", default=False
     )
     parser.add_argument("--port", type=int, help="port", default=8888)
     parser.add_argument("--host", type=str, help="host", default="127.0.0.1")
@@ -59,22 +59,24 @@ def main(args=None):
         "Starting Forwarder %s:%d => %s:%s"
         % (args.host, args.port, args.upstream_host, args.upstream_port)
     )
-    if args.rtt > 0:
-        logger.info("Round Trip Latency (ms): %.d" % args.rtt)
-        # the latency is in seconds, and divided by two for each direction.
-        args.rtt = args.rtt / 2000.0
-    else:
-        logger.info("No latency added.")
-    if args.inkbps > 0:
-        logger.info("Download bandwidth (kbps): %s" % args.inkbps)
-        args.inkbps = args.inkbps * REMOVE_TCP_OVERHEAD
-    else:
-        print("Unlimited Download bandwidth")
-    if args.outkbps > 0:
-        logger.info("Upload bandwidth (kbps): %s" % args.outkbps)
-        args.outkbps = args.outkbps * REMOVE_TCP_OVERHEAD
-    else:
-        logger.info("Unlimited Upload bandwidth")
+    if args.verbose:
+        if args.rtt > 0:
+            logger.debug("Round Trip Latency (ms): %.d" % args.rtt)
+            # the latency is in seconds, and divided by two for each direction.
+            args.rtt = args.rtt / 2000.0
+        else:
+            logger.debug("No latency added.")
+        if args.inkbps > 0:
+            logger.debug("Download bandwidth (kbps): %s" % args.inkbps)
+            args.inkbps = args.inkbps * REMOVE_TCP_OVERHEAD
+        else:
+            logger.debug("Unlimited Download bandwidth")
+        if args.outkbps > 0:
+            logger.debug("Upload bandwidth (kbps): %s" % args.outkbps)
+            args.outkbps = args.outkbps * REMOVE_TCP_OVERHEAD
+        else:
+            logger.debug("Unlimited Upload bandwidth")
+
     server = loop.create_server(
         functools.partial(Forwarder, args), args.host, args.port
     )

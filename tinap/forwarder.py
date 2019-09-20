@@ -10,8 +10,10 @@ class UpstreamConnection(asyncio.Protocol):
         self.downstream = downstream
         self.offline_data = Queue()
         self.transport = None
+        self.logger = get_logger()
 
     def connection_made(self, transport):
+        self.logger.debug("Connection made")
         self.transport = transport
         append_upstream(self)
         # Dequeuing offline data if any...
@@ -103,7 +105,7 @@ class Forwarder(asyncio.Protocol):
 
     def forward_data(self, data):
         self.logger.debug(
-            "%s:%d => %s:%s", self.args.host, self.args.port, self.host, self.port
+            "%s:%d <= %s:%s", self.args.host, self.args.port, self.host, self.port
         )
         self.data_out.put(data)
 
