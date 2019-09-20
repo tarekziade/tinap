@@ -1,5 +1,6 @@
 # Utilities
 import asyncio
+import logging
 
 UPSTREAMS = []
 
@@ -30,3 +31,22 @@ async def resolve(host, port=80):
     addrinfo = await asyncio.get_event_loop().getaddrinfo(host, port)
     _DNS_CACHE[host] = addrinfo[0][4][0]
     return _DNS_CACHE[host]
+
+
+_LOGGER = None
+
+
+def set_logger(level=logging.INFO):
+    global _LOGGER
+    _LOGGER = logging.getLogger("tinap")
+    _LOGGER.setLevel(level)
+    ch = logging.StreamHandler()
+    ch.setLevel(level)
+    _LOGGER.addHandler(ch)
+    return _LOGGER
+
+
+def get_logger():
+    if _LOGGER is None:
+        raise Exception("Logging not configured yet")
+    return _LOGGER

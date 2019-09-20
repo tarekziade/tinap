@@ -1,7 +1,7 @@
 import asyncio
 from queue import Queue, Empty
 
-from tinap.util import append_upstream, remove_upstream
+from tinap.util import append_upstream, remove_upstream, get_logger
 from tinap.throttler import Throttler
 
 
@@ -46,10 +46,8 @@ class UpstreamConnection(asyncio.Protocol):
 
 class Forwarder(asyncio.Protocol):
     def __init__(self, args):
-        if args.mode == "forward":
-            self.host = args.upstream_host
-            self.port = args.upstream_port
-        self.mode = args.mode
+        self.host = args.upstream_host
+        self.port = args.upstream_port
         self.upstream = None
         self.loop = asyncio.get_event_loop()
         self.latency = args.rtt
@@ -58,6 +56,8 @@ class Forwarder(asyncio.Protocol):
         self.outkbps = args.outkbps
         self.inkbps = args.inkbps
         self.transport = None
+        self.args = args
+        self.logger = get_logger()
 
     async def _sconnect(self):
         try:
@@ -75,8 +75,6 @@ class Forwarder(asyncio.Protocol):
         self.data_out.start()
 
     def connection_made(self, transport):
-        if self.mode != "forward":
-            raise NotImplementedError("Subclass me!")
         self.transport = transport
         self.upstream = UpstreamConnection(self)
         self.data_in = Throttler("up", self.upstream, self.latency, self.inkbps)
@@ -104,7 +102,13 @@ class Forwarder(asyncio.Protocol):
         asyncio.ensure_future(_drain())
 
     def forward_data(self, data):
+        self.logger.debug(
+            "%s:%d => %s:%s", self.args.host, self.args.port, self.host, self.port
+        )
         self.data_out.put(data)
 
     def data_received(self, data):
+        self.logger.debug(
+            "%s:%d <= %s:%s", self.args.host, self.args.port, self.host, self.port
+        )
         self.data_in.put(data)

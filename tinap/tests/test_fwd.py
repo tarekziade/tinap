@@ -21,9 +21,8 @@ class FakeArgs:
     rtt = 0.0
     inkbps = 0.0
     outkbps = 0.0
-    mode = "forward"
-    mapports = None
     desthost = None
+    verbose = True
 
 
 class TestTinap(unittest.TestCase):
