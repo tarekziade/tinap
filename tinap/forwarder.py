@@ -44,7 +44,7 @@ class UpstreamConnection(asyncio.Protocol):
         self.transport.close()
 
 
-class BaseServer(asyncio.Protocol):
+class Forwarder(asyncio.Protocol):
     def __init__(self, args):
         if args.mode == "forward":
             self.host = args.upstream_host

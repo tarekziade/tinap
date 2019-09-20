@@ -21,18 +21,6 @@ async def shutdown(server):
     print("Bye!")
 
 
-def parse_port_mappings(option):
-    port_mappings = {}
-    option = option.strip("'\" \t\r\n")
-    for pair in option.split(","):
-        src, dest = pair.split(":")
-        if src == "*":
-            port_mappings["default"] = int(dest)
-        else:
-            port_mappings[src] = int(dest)
-    return port_mappings
-
-
 _DNS_CACHE = {}
 
 
