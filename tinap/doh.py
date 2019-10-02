@@ -416,6 +416,8 @@ class H2Protocol(asyncio.Protocol):
             self.return_415(stream_id)
             return
 
+        # XXX todo: return immediatly Tinap's IP if
+        # the option is used (--redirect-ip)
         # Do actual DNS Query
         try:
             dnsq = dns_query_from_body(body, self.debug)
@@ -463,6 +465,8 @@ class H2Protocol(asyncio.Protocol):
         self.transport.write(self.conn.data_to_send())
 
     async def resolve(self, dnsq, stream_id):
+        # XXX Todo add network throttling here when activated.
+        # (same options than tinap's main script)
         clientip = self.transport.get_extra_info("peername")[0]
         dnsclient = DNSClient(
             self.upstream_resolver, self.upstream_port, logger=self.logger
