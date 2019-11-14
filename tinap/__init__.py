@@ -6,7 +6,7 @@ import functools
 import logging
 
 from tinap.forwarder import Forwarder
-from tinap.util import shutdown, set_logger
+from tinap.util import shutdown, sync_shutdown, set_logger
 
 # TCP overhead (value taken from tsproxy)
 REMOVE_TCP_OVERHEAD = 1460.0 / 1500.0
@@ -83,13 +83,19 @@ def main(args=None):
     server = loop.run_until_complete(server)
     assert server is not None
 
-    for sig in (signal.SIGTERM, signal.SIGINT):
-        loop.add_signal_handler(
-            sig, lambda sig=sig: asyncio.ensure_future(shutdown(server))
-        )
+    try:
+        for sig in (signal.SIGTERM, signal.SIGINT):
+            loop.add_signal_handler(
+                sig, lambda sig=sig: asyncio.ensure_future(shutdown(server))
+            )
+    except NotImplementedError:
+        # platform not supported
+        pass
 
     try:
         loop.run_until_complete(server.wait_closed())
+    except KeyboardInterrupt:
+        sync_shutdown(server)
     finally:
         loop.close()
 
