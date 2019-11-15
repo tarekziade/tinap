@@ -19,7 +19,7 @@ def sync_shutdown(server, *args, **kw):
     for upstream in UPSTREAMS:
         upstream.close()
     server.close()
-    print("Bye!")
+    return 1
 
 
 async def shutdown(server):

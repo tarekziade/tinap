@@ -4,6 +4,7 @@ import os
 import time
 import asyncio
 import multiprocessing
+import sys
 
 import requests
 
@@ -32,7 +33,7 @@ def ping(pid, queue):
         resp = e
     duration = time.time() - start
     queue.put((duration, resp))
-    os.kill(pid, signal.SIGTERM)
+    os.kill(pid, sys.platform == "win32" and signal.CTRL_C_EVENT or signal.SIGINT)
 
 
 class TestTinap(unittest.TestCase):
