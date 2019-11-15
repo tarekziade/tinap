@@ -14,7 +14,7 @@ def remove_upstream(upstream):
 
 
 def sync_shutdown(server, *args, **kw):
-    """Called on any SIGTERM/SIGKILL to gracefully shutdown tinap.
+    """Called on any SIGTERM/SIGINT to gracefully shutdown tinap.
     """
     for upstream in UPSTREAMS:
         upstream.close()

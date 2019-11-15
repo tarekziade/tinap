@@ -95,13 +95,16 @@ def main(args=None):
         except ImportError:
             print("You need to run 'pip install pywin32'")
             raise
-        win32api.SetConsoleCtrlHandler(functools.partial(loop.call_soon_threadsafe, sync_shutdown, server), True) 
+        win32api.SetConsoleCtrlHandler(
+            functools.partial(loop.call_soon_threadsafe, sync_shutdown, server), True
+        )
 
     try:
         loop.run_until_complete(server.wait_closed())
     finally:
         loop.close()
     print("Bye")
+
 
 if __name__ == "__main__":
     main()
