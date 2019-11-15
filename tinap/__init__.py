@@ -4,6 +4,7 @@ import asyncio
 import argparse
 import functools
 import logging
+import sys
 
 from tinap.forwarder import Forwarder
 from tinap.util import shutdown, sync_shutdown, set_logger
@@ -83,19 +84,17 @@ def main(args=None):
     server = loop.run_until_complete(server)
     assert server is not None
 
-    try:
+    if sys.platform != "win32":
         for sig in (signal.SIGTERM, signal.SIGINT):
             loop.add_signal_handler(
                 sig, lambda sig=sig: asyncio.ensure_future(shutdown(server))
             )
-    except NotImplementedError:
-        # platform not supported
-        pass
+    else:
+        for sig in (signal.SIGTERM, signal.SIGINT):
+            signal.signal(sig, functools.partial(sync_shutdown, server))
 
     try:
         loop.run_until_complete(server.wait_closed())
-    except KeyboardInterrupt:
-        sync_shutdown(server)
     finally:
         loop.close()
 
