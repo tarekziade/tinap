@@ -2,10 +2,8 @@ import unittest
 import signal
 import os
 import time
-import threading
-import functools
-import uuid
 import asyncio
+import multiprocessing
 
 import requests
 
@@ -25,37 +23,37 @@ class FakeArgs:
     verbose = True
 
 
+def ping(pid, queue):
+    time.sleep(1)
+    start = time.time()
+    try:
+        resp = requests.get("http://localhost:8887")
+    except Exception as e:
+        resp = e
+    duration = time.time() - start
+    queue.put((duration, resp))
+    os.kill(pid, signal.SIGTERM)
+
+
 class TestTinap(unittest.TestCase):
-
-    res = {}
-
-    def ping(self, uuid_):
-        time.sleep(1)
-        start = time.time()
-        try:
-            resp = requests.get("http://localhost:8887")
-        except Exception as e:
-            resp = e
-        duration = time.time() - start
-        self.res[uuid_] = duration, resp
-        os.kill(os.getpid(), signal.SIGTERM)
-
     def _run_test(self, **kw):
         old_loop = asyncio.get_event_loop()
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
-        uuid_ = str(uuid.uuid4())
         args = FakeArgs()
         for k, v in kw.items():
             setattr(args, k, v)
-        thread = threading.Thread(target=functools.partial(self.ping, uuid_))
-        thread.start()
+
+        queue = multiprocessing.Queue()
+        pinger = multiprocessing.Process(target=ping, args=(os.getpid(), queue))
+        pinger.start()
+
         try:
             main(args)
         finally:
-            thread.join()
+            pinger.join()
             asyncio.set_event_loop(old_loop)
-        duration, resp = self.res[uuid_]
+        duration, resp = queue.get()
         if isinstance(resp, requests.exceptions.ConnectionError):
             raise resp
         return duration, resp

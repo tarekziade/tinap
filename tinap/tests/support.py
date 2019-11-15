@@ -20,38 +20,38 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         return super(Handler, self).do_GET()
 
 
+def _run(port):
+    os.chdir(HERE)
+    socketserver.TCPServer.allow_reuse_address = True
+    attempts = 0
+    httpd = None
+    error = None
+
+    while attempts < 3:
+        try:
+            httpd = socketserver.TCPServer(("", port), Handler)
+            break
+        except Exception as e:
+            error = e
+            attempts += 1
+            time.sleep(0.1)
+
+    if httpd is None:
+        raise OSError("Could not start the coserver: %s" % str(error))
+
+    def _shutdown(*args, **kw):
+        httpd.server_close()
+        sys.exit(0)
+
+    signal.signal(signal.SIGTERM, _shutdown)
+    signal.signal(signal.SIGINT, _shutdown)
+    httpd.serve_forever()
+
+
 def run_server(port=8888):
     """Running in a subprocess to avoid any interference
     """
-
-    def _run():
-        os.chdir(HERE)
-        socketserver.TCPServer.allow_reuse_address = True
-        attempts = 0
-        httpd = None
-        error = None
-
-        while attempts < 3:
-            try:
-                httpd = socketserver.TCPServer(("", port), Handler)
-                break
-            except Exception as e:
-                error = e
-                attempts += 1
-                time.sleep(0.1)
-
-        if httpd is None:
-            raise OSError("Could not start the coserver: %s" % str(error))
-
-        def _shutdown(*args, **kw):
-            httpd.server_close()
-            sys.exit(0)
-
-        signal.signal(signal.SIGTERM, _shutdown)
-        signal.signal(signal.SIGINT, _shutdown)
-        httpd.serve_forever()
-
-    p = multiprocessing.Process(target=_run)
+    p = multiprocessing.Process(target=_run, args=(port,))
     p.start()
     start = time.time()
     connected = False
