@@ -105,7 +105,7 @@ class Forwarder(asyncio.Protocol):
 
     def forward_data(self, data):
         self.logger.debug(
-            "%s:%d <= %s:%s", self.args.host, self.args.port, self.host, self.port
+            "%s:%d => %s:%s", self.args.host, self.args.port, self.host, self.port
         )
         self.data_out.put(data)
 

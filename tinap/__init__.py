@@ -60,11 +60,14 @@ def main(args=None):
         "Starting Forwarder %s:%d => %s:%s"
         % (args.host, args.port, args.upstream_host, args.upstream_port)
     )
+
+    if args.rtt > 0:
+        # the latency is in seconds, and divided by two for each direction.
+        args.rtt = args.rtt / 2000.0
+
     if args.verbose:
         if args.rtt > 0:
             logger.debug("Round Trip Latency (ms): %.d" % args.rtt)
-            # the latency is in seconds, and divided by two for each direction.
-            args.rtt = args.rtt / 2000.0
         else:
             logger.debug("No latency added.")
         if args.inkbps > 0:
