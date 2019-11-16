@@ -1,11 +1,15 @@
 import os
+import sys
 from setuptools import setup, find_packages
 
 
 with open("README.rst") as f:
     README = f.read()
 
-install_requires = []
+if sys.platform == "win32":
+    install_requires = ["pywin32"]
+else:
+    install_requires = []
 
 
 setup(name="tinap",
