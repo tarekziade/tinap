@@ -54,33 +54,46 @@ def main(args=None):
         args = get_args()
 
     logger = set_logger(args.verbose and logging.DEBUG or logging.INFO)
-
     loop = asyncio.get_event_loop()
-    logger.info(
-        "Starting Forwarder %s:%d => %s:%s"
-        % (args.host, args.port, args.upstream_host, args.upstream_port)
-    )
-
-    if args.rtt > 0:
-        # the latency is in seconds, and divided by two for each direction.
-        args.rtt = args.rtt / 2000.0
 
     if args.verbose:
+        logger.info(
+            "Starting Forwarder %s:%d => %s:%s"
+            % (args.host, args.port, args.upstream_host, args.upstream_port)
+        )
         if args.rtt > 0:
-            logger.debug("Round Trip Latency (ms): %.d" % args.rtt)
+            logger.debug("Round Trip Latency (ms): %d" % args.rtt)
         else:
             logger.debug("No latency added.")
         if args.inkbps > 0:
             logger.debug("Download bandwidth (kbps): %s" % args.inkbps)
-            args.inkbps = args.inkbps * REMOVE_TCP_OVERHEAD
         else:
             logger.debug("Unlimited Download bandwidth")
         if args.outkbps > 0:
             logger.debug("Upload bandwidth (kbps): %s" % args.outkbps)
-            args.outkbps = args.outkbps * REMOVE_TCP_OVERHEAD
         else:
             logger.debug("Unlimited Upload bandwidth")
+    else:
+        logger.info(
+            "Starting Forwarder %s:%d => %s:%s (rtt=%d, inkbps=%s, outkbps=%s)"
+            % (
+                args.host,
+                args.port,
+                args.upstream_host,
+                args.upstream_port,
+                args.rtt,
+                args.inkbps,
+                args.outkbps,
+            )
+        )
 
+    if args.rtt > 0:
+        # the latency is in seconds, and divided by two for each direction.
+        args.rtt = args.rtt / 2000.0
+    if args.outkbps > 0:
+        args.outkbps = args.outkbps * REMOVE_TCP_OVERHEAD
+    if args.inkbps > 0:
+        args.inkbps = args.inkbps * REMOVE_TCP_OVERHEAD
     server = loop.create_server(
         functools.partial(Forwarder, args), args.host, args.port
     )
