@@ -13,6 +13,18 @@ Features:
 - Plain port forwarding or Socks5 proxy mode
 - Network traffic shaping copied from `tsproxy <This is intended to replace tsproxy https://github.com/WPO-Foundation/tsproxy>`_
 
+Installation
+============
+
+Tinap is a pure Python script, you can install it with::
+
+   $ pip install tinap
+
+If you are under windows you need to install pywin32 as well::
+
+   $ pip install pywin32
+
+
 
 How to use
 ==========
