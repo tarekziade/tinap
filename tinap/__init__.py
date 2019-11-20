@@ -11,6 +11,14 @@ from tinap.util import shutdown, sync_shutdown, set_logger
 
 # TCP overhead (value taken from tsproxy)
 REMOVE_TCP_OVERHEAD = 1460.0 / 1500.0
+_PORT_MAPPING_HELP = """\
+Comma-separated list of port forwarding rules each rule
+is composed of <source_host>:<source_port>/<target_host>:<target_port>
+
+Example (forwards port 80 and 443 to 8080 and 8282):
+
+  127.0.0.1:80/127.0.0.1:8080,127.0.0.1:443/127.0.0.1:8282
+"""
 
 
 def get_args():
@@ -18,12 +26,17 @@ def get_args():
     parser.add_argument(
         "-v", "--verbose", action="store_true", help="Verbose mode", default=False
     )
-    parser.add_argument("--port", type=int, help="port", default=8888)
+    # port mapping options
     parser.add_argument("--host", type=str, help="host", default="127.0.0.1")
-    parser.add_argument("--upstream-port", type=int, help="upstream port", default=8080)
     parser.add_argument(
         "--upstream-host", type=str, help="upstream host", default="127.0.0.1"
     )
+    parser.add_argument("--port", type=int, help="port", default=8888)
+    parser.add_argument("--upstream-port", type=int, help="upstream port", default=8080)
+    parser.add_argument(
+        "--port-mapping", type=str, help=_PORT_MAPPING_HELP, default=None
+    )
+
     parser.add_argument(
         "-r", "--rtt", type=float, default=0.0, help="Round Trip Time Latency (in ms)."
     )
@@ -53,14 +66,28 @@ def main(args=None):
     if args is None:
         args = get_args()
 
+    port_mapping = {}
+    if args.port_mapping is not None:
+        for item in args.port_mapping.split(","):
+            item = item.strip()
+            if not item:
+                continue
+            source, target = item.split("/")
+            source_host, source_port = source.split(":")
+            target_host, target_port = target.split(":")
+            port_mapping[source_host, int(source_port)] = target_host, int(target_port)
+    else:
+        port_mapping[args.host, args.port] = args.upstream_host, args.upstream_port
+
     logger = set_logger(args.verbose and logging.DEBUG or logging.INFO)
     loop = asyncio.get_event_loop()
 
     if args.verbose:
-        logger.info(
-            "Starting Forwarder %s:%d => %s:%s"
-            % (args.host, args.port, args.upstream_host, args.upstream_port)
-        )
+        for (host, port), (upstream_host, upstream_port) in port_mapping.items():
+            logger.info(
+                "Starting Forwarder %s:%d => %s:%s"
+                % (host, port, upstream_host, upstream_port)
+            )
         if args.rtt > 0:
             logger.debug("Round Trip Latency (ms): %d" % args.rtt)
         else:
@@ -74,18 +101,20 @@ def main(args=None):
         else:
             logger.debug("Unlimited Upload bandwidth")
     else:
-        logger.info(
-            "Starting Forwarder %s:%d => %s:%s (rtt=%d, inkbps=%s, outkbps=%s)"
-            % (
-                args.host,
-                args.port,
-                args.upstream_host,
-                args.upstream_port,
-                args.rtt,
-                args.inkbps,
-                args.outkbps,
+
+        for (host, port), (upstream_host, upstream_port) in port_mapping.items():
+            logger.info(
+                "Starting Forwarder %s:%d => %s:%d (rtt=%d, inkbps=%s, outkbps=%s)"
+                % (
+                    host,
+                    port,
+                    upstream_host,
+                    upstream_port,
+                    args.rtt,
+                    args.inkbps,
+                    args.outkbps,
+                )
             )
-        )
 
     if args.rtt > 0:
         # the latency is in seconds, and divided by two for each direction.
@@ -94,16 +123,24 @@ def main(args=None):
         args.outkbps = args.outkbps * REMOVE_TCP_OVERHEAD
     if args.inkbps > 0:
         args.inkbps = args.inkbps * REMOVE_TCP_OVERHEAD
-    server = loop.create_server(
-        functools.partial(Forwarder, args), args.host, args.port
-    )
-    server = loop.run_until_complete(server)
-    assert server is not None
+
+    servers = []
+    for (host, port), (upstream_host, upstream_port) in port_mapping.items():
+        server = loop.create_server(
+            functools.partial(
+                Forwarder, host, port, upstream_host, upstream_port, args
+            ),
+            host,
+            port,
+        )
+        server = loop.run_until_complete(server)
+        assert server is not None
+        servers.append(server)
 
     if sys.platform != "win32":
         for sig in (signal.SIGTERM, signal.SIGINT):
             loop.add_signal_handler(
-                sig, lambda sig=sig: asyncio.ensure_future(shutdown(server))
+                sig, lambda sig=sig: asyncio.ensure_future(shutdown(servers))
             )
     else:
         try:
@@ -112,11 +149,12 @@ def main(args=None):
             print("You need to run 'pip install pywin32'")
             raise
         win32api.SetConsoleCtrlHandler(
-            functools.partial(loop.call_soon_threadsafe, sync_shutdown, server), True
+            functools.partial(loop.call_soon_threadsafe, sync_shutdown, servers), True
         )
 
     try:
-        loop.run_until_complete(server.wait_closed())
+        for server in servers:
+            loop.run_until_complete(server.wait_closed())
     finally:
         loop.close()
     print("Bye")

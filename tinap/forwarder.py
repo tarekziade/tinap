@@ -47,9 +47,11 @@ class UpstreamConnection(asyncio.Protocol):
 
 
 class Forwarder(asyncio.Protocol):
-    def __init__(self, args):
-        self.host = args.upstream_host
-        self.port = args.upstream_port
+    def __init__(self, host, port, upstream_host, upstream_port, args):
+        self.downstream_host = host
+        self.downstream_port = port
+        self.host = upstream_host
+        self.port = upstream_port
         self.upstream = None
         self.loop = asyncio.get_event_loop()
         self.latency = args.rtt
@@ -105,12 +107,20 @@ class Forwarder(asyncio.Protocol):
 
     def forward_data(self, data):
         self.logger.debug(
-            "%s:%d => %s:%s", self.args.host, self.args.port, self.host, self.port
+            "%s:%d => %s:%s",
+            self.downstream_host,
+            self.downstream_port,
+            self.host,
+            self.port,
         )
         self.data_out.put(data)
 
     def data_received(self, data):
         self.logger.debug(
-            "%s:%d <= %s:%s", self.args.host, self.args.port, self.host, self.port
+            "%s:%d <= %s:%s",
+            self.downstream_host,
+            self.downstream_port,
+            self.host,
+            self.port,
         )
         self.data_in.put(data)

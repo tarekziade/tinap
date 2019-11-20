@@ -13,19 +13,20 @@ def remove_upstream(upstream):
     UPSTREAMS.remove(upstream)
 
 
-def sync_shutdown(server, *args, **kw):
+def sync_shutdown(servers, *args, **kw):
     """Called on any SIGTERM/SIGINT to gracefully shutdown tinap.
     """
     for upstream in UPSTREAMS:
         upstream.close()
-    server.close()
+    for server in servers:
+        server.close()
     return 1
 
 
-async def shutdown(server):
+async def shutdown(servers):
     """Called on any SIGTERM/SIGKILL to gracefully shutdown tinap.
     """
-    sync_shutdown(server)
+    sync_shutdown(servers)
 
 
 _DNS_CACHE = {}

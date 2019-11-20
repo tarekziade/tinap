@@ -13,10 +13,7 @@ from tinap import main
 
 
 class FakeArgs:
-    upstream_host = "localhost"
-    upstream_port = 8888
-    port = 8887
-    host = "localhost"
+    port_mapping = "localhost:8887/localhost:8888"
     rtt = 0.0
     inkbps = 0.0
     outkbps = 0.0
