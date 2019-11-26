@@ -80,7 +80,11 @@ def main(args=None):
         port_mapping[args.host, args.port] = args.upstream_host, args.upstream_port
 
     logger = set_logger(args.verbose and logging.DEBUG or logging.INFO)
-    loop = asyncio.get_event_loop()
+    if sys.platform == "win32":
+        loop = asyncio.ProactorEventLoop()
+        asyncio.set_event_loop(loop)
+    else:
+        loop = asyncio.get_event_loop()
 
     if args.verbose:
         for (host, port), (upstream_host, upstream_port) in port_mapping.items():
