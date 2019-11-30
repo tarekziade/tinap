@@ -14,7 +14,7 @@ else:
 
 
 setup(name="tinap",
-      version="0.2",
+      version="0.3",
       author="Tarek Ziadé",
       author_email="tarek@mozilla.com",
       url="https://github.com/tarekziade/tinap",
