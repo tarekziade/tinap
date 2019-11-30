@@ -13,7 +13,7 @@ else:
 
 
 setup(name="tinap",
-      version="0.1",
+      version="0.2",
       packages=find_packages(),
       description="Port forwarding with traffic shaping",
       long_description=README,

@@ -6,12 +6,16 @@ tinap -- stands for "This Is Not A Proxy"
 
 It's also a beautiful place in Bangladesh with the biggest waterfall of that country.
 
-The Urban Dictionary also `says <https://www.urbandictionary.com/define.php?term=tinap>`_ it's "young people who go to rave parties who are dressed in bright and extreme styles of clothing".
+The Urban Dictionary also `says
+<https://www.urbandictionary.com/define.php?term=tinap>`_ it's "young people
+who go to rave parties who are dressed in bright and extreme styles of
+clothing".
 
 Features:
 
-- Plain port forwarding or Socks5 proxy mode
-- Network traffic shaping copied from `tsproxy <This is intended to replace tsproxy https://github.com/WPO-Foundation/tsproxy>`_
+- protocol-agnostic port forwarder
+- Network traffic shaping inspired from `tsproxy <This is intended to replace tsproxy https://github.com/WPO-Foundation/tsproxy>`_
+
 
 Installation
 ============
@@ -23,7 +27,6 @@ Tinap is a pure Python script, you can install it with::
 If you are under windows you need to install pywin32 as well::
 
    $ pip install pywin32
-
 
 
 How to use
