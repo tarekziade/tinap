@@ -32,54 +32,32 @@ How to use
 Tinap has a few general options, followed by a mode (forward or socks)::
 
    $ tinap --help
-   usage: tinap [-h] [--port PORT] [--host HOST] [-r RTT] [-i INKBPS]
-               [-o OUTKBPS]
-               {forward,socks5} ...
+   usage: tinap [-h] [-v] [--host HOST] [--upstream-host UPSTREAM_HOST]
+               [--port PORT] [--upstream-port UPSTREAM_PORT]
+               [--port-mapping PORT_MAPPING] [-r RTT] [-i INKBPS] [-o OUTKBPS]
 
    Tinap port forwarder
 
-   positional arguments:
-   {forward,socks5}      Mode of operation
-      forward             Port forwarding
-      socks5              Socks5 Pproxy
-
    optional arguments:
    -h, --help            show this help message and exit
-   --port PORT           port
+   -v, --verbose         Verbose mode
    --host HOST           host
+   --upstream-host UPSTREAM_HOST
+                           upstream host
+   --port PORT           port
+   --upstream-port UPSTREAM_PORT
+                           upstream port
+   --port-mapping PORT_MAPPING
+                           Comma-separated list of port forwarding rules each
+                           rule is composed of <source_host>:<source_port>/<targe
+                           t_host>:<target_port> Example (forwards port 80 and
+                           443 to 8080 and 8282): 127.0.0.1:80/127.0.0.1:8080,127
+                           .0.0.1:443/127.0.0.1:8282
    -r RTT, --rtt RTT     Round Trip Time Latency (in ms).
    -i INKBPS, --inkbps INKBPS
                            Download Bandwidth (in 1000 bits/s - Kbps).
    -o OUTKBPS, --outkbps OUTKBPS
                            Upload Bandwidth (in 1000 bits/s - Kbps).
-
-The forward mode needs to know where to forward things::
-
-   $ tinap forward --help
-   usage: tinap forward [-h] [--upstream-port UPSTREAM_PORT]
-                        [--upstream-host UPSTREAM_HOST]
-
-   optional arguments:
-   -h, --help            show this help message and exit
-   --upstream-port UPSTREAM_PORT
-                           upstream port
-   --upstream-host UPSTREAM_HOST
-                           upstream host
-
-And the socks mode has its own extra options, copied from tsproxy::
-
-   $ tinap socks5 --help
-   usage: tinap socks5 [-h] [-d DESTHOST] [-m MAPPORTS]
-
-   optional arguments:
-   -h, --help            show this help message and exit
-   -d DESTHOST, --desthost DESTHOST
-                           Redirect all outbound connections to the specified
-                           host.
-   -m MAPPORTS, --mapports MAPPORTS
-                           Remap outbound ports. Comma-separated list of
-                           original:new with * as a wildcard.--mapports
-                           '443:8443,*:8080'
 
 
 Configuration examples
