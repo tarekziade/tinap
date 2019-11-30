@@ -14,6 +14,9 @@ else:
 
 setup(name="tinap",
       version="0.2",
+      author="Tarek Ziadé",
+      author_email="tarek@mozilla.com",
+      url="https://github.com/tarekziade/tinap",
       packages=find_packages(),
       description="Port forwarding with traffic shaping",
       long_description=README,
